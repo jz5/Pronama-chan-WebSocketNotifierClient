@@ -34,36 +34,90 @@ namespace WebSocketNotifierClient
             ShowBalloon(ToolTipIcon.Error, e.Exception.Message);
         }
 
-        private void OnError(object sender, string message)
+        private void OnError(object sender, ErrorEventArgs message)
         {
-            ShowBalloon(ToolTipIcon.Error, message);
+            ShowBalloon(ToolTipIcon.Error, message.Message);
         }
 
-        private void OnRecievedMessage(object sender, string message)
+        private void OnRecievedMessage(object sender, MessageEventArgs message)
         {
-            var result = BuildResult.Parse(message);
+            var result = BuildResult.Parse(message.Data);
             var msg = result.ToMessage();
 
-            // ポップアップを表示
+            if (result.IsFailure)
+            {
+                ShowBalloon(ToolTipIcon.Info, msg);
+                PlaySound(result);
+                return;
+            }
+
+            if (Settings.Default.ShowErrorOnly)
+            {
+                return;
+            }
+
+
             if (result.IsSuccess)
             {
-                if (Settings.Default.ShowErrorOnly == false)
-                {
-                    ShowBalloon(ToolTipIcon.Info, msg);
-                }
+                ShowBalloon(ToolTipIcon.Info, msg);
+                PlaySound(result);
             }
             else if (result.IsUnstable)
             {
-                if (Settings.Default.ShowErrorOnly == false)
-                {
-                    ShowBalloon(ToolTipIcon.Warning, msg);
-                }
+                ShowBalloon(ToolTipIcon.Warning, msg);
+                PlaySound(result);
+            }
+            else if (result.IsAborted)
+            {
+                ShowBalloon(ToolTipIcon.Info, msg);
+                PlaySound(result);
+            }
+        }
+
+        private void PlaySound(BuildResult result)
+        {
+            var path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            var file = "";
+
+            if (result.IsSuccess)
+            {
+                file = "success.wav";
+            }
+            else if (result.IsFailure)
+            {
+                file = "failure.wav";
+            }
+            else if (result.IsUnstable)
+            {
+                file = "unstable.wav";
+            }
+            else if (result.IsAborted)
+            {
+                file = "aborted.wav";
             }
             else
             {
-                ShowBalloon(ToolTipIcon.Error, msg);
+                return;
+            }
+
+            var wavPath = System.IO.Path.Combine(path, file);
+            if (System.IO.File.Exists(wavPath))
+            {
+                try
+                {
+                    using (var player = new System.Media.SoundPlayer(wavPath))
+                    {
+                        player.PlaySync();
+                    }
+                }
+                catch (Exception)
+                {
+                    /* Do nothing */
+                    throw;
+                }
             }
         }
+
 
         private void ShowBalloon(ToolTipIcon icon, string message)
         {
@@ -78,7 +132,7 @@ namespace WebSocketNotifierClient
             if (_client != null)
             {
                 _client.OnMessage -= OnRecievedMessage;
-                _client.OnError -= OnError; 
+                _client.OnError -= OnError;
                 _client.Close();
             }
             _client = new WebSocket(Settings.Default.Url);

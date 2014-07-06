@@ -32,6 +32,11 @@ namespace WebSocketNotifierClient
             get { return "FAILURE".Equals(Result); }
         }
 
+        public bool IsAborted
+        {
+            get { return "ABORTED".Equals(Result); }
+        }
+
         public static BuildResult Parse(string message)
         {
             var bytes = Encoding.Unicode.GetBytes(message);
